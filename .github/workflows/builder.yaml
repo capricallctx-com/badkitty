@@ -1,5 +1,5 @@
-name: GitHub Actions Demo
-run-name: ${{ github.actor }} launches a build
+name: Unleash the Kittah!
+run-name: ${{ github.actor }} has launched a build
 on: [push]
 jobs:
     build-kitty:
@@ -27,7 +27,7 @@ jobs:
                 echo "Package: badkitty" > badkitty_1.0+${{github.run_number}}/DEBIAN/control
                 echo "Version: 1.0+${{github.run_number}}" >> badkitty_1.0+${{github.run_number}}/DEBIAN/control
                 echo "Section: base" >> badkitty_1.0+${{github.run_number}}/DEBIAN/control
-                echo "Priority: optional" >> dbadkitty_1.0+${{github.run_number}}/DEBIAN/control
+                echo "Priority: optional" >> badkitty_1.0+${{github.run_number}}/DEBIAN/control
                 echo "Architecture: amd86" >> badkitty_1.0+${{github.run_number}}/DEBIAN/control
                 echo "Depends: " >> badkitty_1.0+${{github.run_number}}/DEBIAN/control
                 echo "Maintainer: ${{github.actor}} >> badkitty_1.0+${{github.run_number}}/DEBIAN/control

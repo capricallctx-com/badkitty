@@ -29,8 +29,8 @@ jobs:
                 echo "Section: base" >> badkitty_1.0+${{github.run_number}}/DEBIAN/control
                 echo "Priority: optional" >> badkitty_1.0+${{github.run_number}}/DEBIAN/control
                 echo "Architecture: amd86" >> badkitty_1.0+${{github.run_number}}/DEBIAN/control
-                echo "Depends: " >> badkitty_1.0+${{github.run_number}}/DEBIAN/control
                 echo "Maintainer: ${{github.actor}} >> badkitty_1.0+${{github.run_number}}/DEBIAN/control
+                cat badkitty_1.0+${{github.run_number}}/DEBIAN/control
                 mkdir -p badkitty_1.0+${{github.run_number}}/usr/bin
                 cp badkitty  badkitty_1.0+${{github.run_number}}/usr/bin
                 dpkg-deb --build badkitty_1.0+${{github.run_number}}

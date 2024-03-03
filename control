@@ -1,0 +1,5 @@
+Package: badkitty
+Version: VERSION
+Architecture: amd64
+Maintainer: lee@capricallctx.com
+Description: Clean room, simple web server for containers

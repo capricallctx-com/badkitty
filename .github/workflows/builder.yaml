@@ -34,10 +34,6 @@ jobs:
                 mkdir -p badkitty_1.0+${{github.run_number}}/usr/bin
                 cp badkitty  badkitty_1.0+${{github.run_number}}/usr/bin
                 dpkg-deb --build badkitty_1.0+${{github.run_number}}
-            - uses: actions/upload-artifact@v4
-              with:
-                  name: badkitty_1.0+${{github.run_number}}.deb
-                  path: badkitty_1.0+${{github.run_number}}.deb
             - name: Create Release
               id: create_release
               uses: actions/create-release@v1
@@ -48,3 +44,7 @@ jobs:
                   release_name: Release 1.0+${{github.run_number}}
                   draft: false
                   prerelease: false
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: badkitty_1.0+${{github.run_number}}.deb
+                  path: badkitty_1.0+${{github.run_number}}.deb

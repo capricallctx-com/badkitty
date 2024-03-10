@@ -34,6 +34,12 @@ jobs:
                 mkdir -p badkitty_1.0+${{github.run_number}}/usr/bin
                 cp badkitty  badkitty_1.0+${{github.run_number}}/usr/bin
                 dpkg-deb --build badkitty_1.0+${{github.run_number}}
+            - name: Import GPG key
+              uses: crazy-max/ghaction-import-gpg@v4
+              with:
+                  gpg_private_key: ${{ secrets.GPG }}
+            - name: sign deb
+              run: dpkg-sig --sign builder badkitty_1.0+${{github.run_number}}
             - name: Create Release
               id: create_release
               uses: actions/create-release@v1

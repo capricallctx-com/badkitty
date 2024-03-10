@@ -48,3 +48,7 @@ jobs:
               with:
                   name: badkitty_1.0+${{github.run_number}}.deb
                   path: badkitty_1.0+${{github.run_number}}.deb
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: capricallcpublic0.asc
+                  path: .

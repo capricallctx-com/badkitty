@@ -34,6 +34,9 @@ jobs:
                 mkdir -p badkitty_1.0+${{github.run_number}}/usr/bin
                 cp badkitty  badkitty_1.0+${{github.run_number}}/usr/bin
                 dpkg-deb --build badkitty_1.0+${{github.run_number}}
+            - uses: anchore/sbom-action@v0
+              with:
+                  path: .
             - name: Import GPG key
               uses: crazy-max/ghaction-import-gpg@v4
               with:

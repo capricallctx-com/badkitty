@@ -53,8 +53,8 @@ jobs:
               with:
                   context: .
                   push: true
-                  tags: ${{ steps.meta.outputs.tags }}
-                  labels: ${{ steps.meta.outputs.labels }}
+                  tags: 1.0+${{github.run_number}}
+                  labels: 1.0+${{github.run_number}}
             - name: Import GPG key
               uses: crazy-max/ghaction-import-gpg@v4
               with:

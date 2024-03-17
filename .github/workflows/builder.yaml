@@ -50,7 +50,7 @@ jobs:
                   images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
             - name: Build and push Docker image
               run: |
-                  docker build -t lpreimesberger/badkitty:1.0+${{github.run_number}} .
+                  docker build -t badkitty:1.0+${{github.run_number}} .
             - name: Import GPG key
               uses: crazy-max/ghaction-import-gpg@v4
               with:

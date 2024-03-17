@@ -45,11 +45,6 @@ jobs:
               run: |
                 sudo apt-get install -y dpkg-sig
                 dpkg-sig --sign builder badkitty_1.0+${{github.run_number}}.deb
-            - name: build RPM package
-              id: rpm_build
-              uses: naveenrajm7/rpmbuild@master
-              with:
-                  spec_file: "cello.spec"
             - name: Create Release
               id: create_release
               uses: actions/create-release@v1

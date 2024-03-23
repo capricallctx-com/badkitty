@@ -12,22 +12,25 @@ package main
 
 import (
 	"fmt"
+	"github.com/gorilla/websocket"
 	"github.com/hashicorp/hcl/v2/hclsimple"
 	"go.uber.org/zap"
-	"gopkg.in/yaml.v3"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 var data []byte
 var logger *zap.Logger
 
 type Config struct {
-	IOMode  string        `hcl:"io_mode"`
-	Service ServiceConfig `hcl:"service,block"`
+	IOMode      string        `hcl:"io_mode"`
+	HowlIP      string        `hcl:"howl"`
+	MonitorPort int           `hcl:"monitor_port"`
+	Service     ServiceConfig `hcl:"service,block"`
 }
 
 type ServiceConfig struct {
@@ -97,20 +100,61 @@ func main() {
 		log.Fatalf("Failed to load configuration: %s", err)
 	}
 	log.Printf("Configuration is %#v", config)
-	data, err := os.ReadFile("badkitty.yml")
-	if err != nil {
-		logger.Fatal("error: ", zap.Error(err))
+	/*
+		data, err := os.ReadFile("badkitty.yml")
+		if err != nil {
+			logger.Fatal("error: ", zap.Error(err))
+		}
+		err = yaml.Unmarshal([]byte(data), &t)
+		if err != nil {
+			logger.Fatal("error: ", zap.Error(err))
+		}
+		PrintConfig()
+
+	*/
+	if config.HowlIP != "" {
+		logger.Info("howl starting...")
+		go howlLoop()
 	}
-	err = yaml.Unmarshal([]byte(data), &t)
-	if err != nil {
-		logger.Fatal("error: ", zap.Error(err))
-	}
-	PrintConfig()
 	go serverInsecure()
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
 	fmt.Println("Bad Kitty is running...")
 	<-done // Will block here until user hits ctrl+c
+}
+
+func howlLoop() {
+	url := "ws://localhost:8989" // Your WebSocket endpoint
+	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		log.Fatal("Error connecting to WebSocket server:", err)
+	}
+	defer conn.Close()
+
+	// Send a message (you'll need something listening on the server side)
+	err = conn.WriteMessage(websocket.TextMessage, []byte("Hello from Go client!"))
+	if err != nil {
+		log.Println("Error sending message:", err)
+		return
+	}
+
+	// Receive messages in a loop
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			log.Println("Error receiving message:", err)
+			break
+		}
+		fmt.Printf("Received from server: %s\n", message)
+
+		// Send another message after a short delay
+		time.Sleep(2 * time.Second)
+		err = conn.WriteMessage(websocket.TextMessage, []byte("Another message!"))
+		if err != nil {
+			log.Println("Error sending message:", err)
+			return
+		}
+	}
 }
 
 func serverInsecure() {

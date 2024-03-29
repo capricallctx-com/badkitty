@@ -12,9 +12,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/coocood/freecache"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/hcl/v2/hclsimple"
 	"go.uber.org/zap"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -25,73 +27,19 @@ import (
 
 var data []byte
 var logger *zap.Logger
+var badKittyList *freecache.Cache
+var connectionList *freecache.Cache
+var startTime time.Time
 
-type Config struct {
-	IOMode      string        `hcl:"io_mode"`
-	HowlIP      string        `hcl:"howl"`
-	MonitorPort int           `hcl:"monitor_port"`
-	Service     ServiceConfig `hcl:"service,block"`
-}
-
-type ServiceConfig struct {
-	Protocol   string          `hcl:"protocol,label"`
-	Type       string          `hcl:"type,label"`
-	ListenAddr string          `hcl:"listen_addr"`
-	Processes  []ProcessConfig `hcl:"route,block"`
-}
-
-type ProcessConfig struct {
-	Type   string `hcl:"type,label"`
-	Target string `hcl:"target"`
-}
-
-type ConfigurationInfoStruct struct {
-	Global struct {
-		LoggingLevel    string `yaml:"logging_level"`
-		Verbose         int    `yaml:"verbose"`
-		PrivateKey      string `yaml:"private_key"`
-		Certificate     string `yaml:"certificate"`
-		RandomizeServer bool   `yaml:"randomize_server"`
-		EnableInsecure  bool   `yaml:"enable_insecure"`
-		InsecurePort    int    `yaml:"insecure_port"`
-		EnableTLS       bool   `yaml:"enable_tls"`
-		TLSPort         int    `yaml:"tls_port"`
-		StaticFiles     string `yaml:"static_files"`
-	} `yaml:"global"`
-
-	Static struct {
-		Enable               bool   `yaml:"enable"`
-		Path                 string `yaml:"path"`
-		Index                string `yaml:"index"`
-		Error                string `yaml:"error"`
-		Cors                 bool   `yaml:"cors"`
-		CorsAllow            string `yaml:"cors_allow"`
-		CorsMaxAge           int    `yaml:"cors_max_age"`
-		CorsAllowHeaders     string `yaml:"cors_allow_headers"`
-		CorsAllowMethods     string `yaml:"cors_allow_methods"`
-		CorsExposeHeaders    string `yaml:"cors_expose_headers"`
-		CorsAllowCredentials bool   `yaml:"cors_allow_credentials"`
-		CorsDebug            bool   `yaml:"cors_debug"`
-	} `yaml:"static"`
-}
-
-var t ConfigurationInfoStruct
-var config Config
-
-func PrintConfig() {
-	log.Println("Logging Level:", t.Global.LoggingLevel)
-	log.Println("Verbose:", t.Global.Verbose)
-	log.Println("Private Key:", t.Global.PrivateKey)
-	log.Println("Certificate:", t.Global.Certificate)
-	log.Println("Randomize Server:", t.Global.RandomizeServer)
-	log.Println("Enable Insecure:", t.Global.EnableInsecure)
-	log.Println("Insecure Port:", t.Global.InsecurePort)
-	log.Println("Enable TLS:", t.Global.EnableTLS)
-	log.Println("TLS Port:", t.Global.TLSPort)
-}
-
+// main entry point
 func main() {
-	AmIRoot()
+	AmIRoot()        // need root powers - this is made for container use
+	config2Monitor() // export configuration back
+	// allocate TTL caches
+	badKittyList = freecache.NewCache(1024 * 1024)
+	connectionList = freecache.NewCache(1024 * 1024)
+	startTime = time.Now()
+
 	logger = zap.Must(zap.NewProduction())
 	defer logger.Sync()
 
@@ -100,23 +48,19 @@ func main() {
 		log.Fatalf("Failed to load configuration: %s", err)
 	}
 	log.Printf("Configuration is %#v", config)
-	/*
-		data, err := os.ReadFile("badkitty.yml")
-		if err != nil {
-			logger.Fatal("error: ", zap.Error(err))
-		}
-		err = yaml.Unmarshal([]byte(data), &t)
-		if err != nil {
-			logger.Fatal("error: ", zap.Error(err))
-		}
-		PrintConfig()
-
-	*/
+	if config.MonitorPort != 0 {
+		logger.Info("Starting Monitor Server ", zap.Int("port", config.MonitorPort))
+		go monitorPort()
+	}
 	if config.HowlIP != "" {
 		logger.Info("howl starting...")
 		go howlLoop()
 	}
+	if config.ParkingMode {
+		logger.Info("Parking Mode is enabled - every route will return the same response")
+	}
 	go serverInsecure()
+
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
 	fmt.Println("Bad Kitty is running...")
@@ -158,20 +102,47 @@ func howlLoop() {
 }
 
 func serverInsecure() {
-	if t.Global.EnableInsecure {
-		logger.Warn("WARNING: Insecure mode is enabled. This can be a security risk.")
+	if config.InsecurePort == 0 {
+		logger.Info("Insecure server is disabled")
+		return
 	}
-	logger.Info("Starting Insecure Server ", zap.Int("port", t.Global.InsecurePort))
-	for _, route := range config.Service.Processes {
-		fmt.Println(route.Target, route.Type)
+	logger.Warn("WARNING: Insecure mode is enabled. This can be a security risk.")
+	logger.Info("Starting Insecure Server ", zap.Int("port", config.InsecurePort))
+	if !config.ParkingMode {
+		for _, route := range config.Service.Processes {
+			fmt.Println(route.Target, route.Type)
+		}
+		if IsNotEmpty(config.StaticPath) {
+			// makes no sense to have a static file server that's not /
+			http.Handle("/", http.FileServer(http.Dir(config.StaticPath)))
+		}
+
+	} else {
+		http.HandleFunc("/", parkingHandler)
 	}
-	if IsNotEmpty(t.Static.Path) {
-		// makes no sense to have a static file server that's not /
-		http.Handle("/", http.FileServer(http.Dir(t.Static.Path)))
-	}
-	err := http.ListenAndServe(fmt.Sprintf(":%d", t.Global.InsecurePort), nil)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", config.InsecurePort), nil)
 	if err != nil {
 		logger.Fatal("error: ", zap.Error(err))
 	}
 
+}
+
+func parkingHandler(w http.ResponseWriter, r *http.Request) {
+	// Create a new template.
+	tmpl := template.New("index.html")
+
+	// Parse the template.
+	tmpl, err := tmpl.Parse(`
+        <h1>Hello, {{.Version}}!</h1>
+    `)
+	if err != nil {
+		panic(err)
+	}
+
+	err = tmpl.Execute(w, MonitorData)
+	if err != nil {
+		panic(err)
+	}
+	//w.WriteHeader(http.StatusOK)
+	//w.Write([]byte("Parking Mode"))
 }

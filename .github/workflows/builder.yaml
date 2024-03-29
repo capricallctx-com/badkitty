@@ -24,6 +24,9 @@ jobs:
             - name: build debian file
               run: |
                 mkdir -p badkitty_1.0+${{github.run_number}}/DEBIAN
+                cat /proc/cpuinfo
+                cat /proc/meminfo
+                df -h
                 echo "Package: badkitty" > badkitty_1.0+${{github.run_number}}/DEBIAN/control
                 echo "Version: 1.0+${{github.run_number}}" >> badkitty_1.0+${{github.run_number}}/DEBIAN/control
                 echo "Section: base" >> badkitty_1.0+${{github.run_number}}/DEBIAN/control
